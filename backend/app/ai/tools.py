@@ -605,7 +605,7 @@ def _t_send_draft(args: dict, primary: int, scope: list[int]) -> dict:
 
 def _t_start_organize(args: dict, primary: int, scope: list[int]) -> dict:
     account_id = args.get("account_id") or primary
-    job_id = jobs.submit("organize", account_id=int(account_id), folder="INBOX", limit=200)
+    job_id = jobs.submit("organize", account_id=int(account_id), folder="INBOX", limit=2000)
     return {"job_id": job_id, "hint": "AI 整理已在后台开始，完成后通知"}
 
 

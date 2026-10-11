@@ -55,7 +55,7 @@ class WriteIn(BaseModel):
 class OrganizeIn(BaseModel):
     account_id: int | None = None
     folder: str = "INBOX"
-    limit: int = 200
+    limit: int = 2000
 
 
 class ManagerChatIn(BaseModel):

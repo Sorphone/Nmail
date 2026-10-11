@@ -373,7 +373,7 @@ export default function MailBrowser({
   })
 
   const organizeMutation = useMutation({
-    mutationFn: () => api.aiOrganize({ account_id: accountId ?? undefined, folder: 'INBOX', limit: 200 }),
+    mutationFn: () => api.aiOrganize({ account_id: accountId ?? undefined, folder: 'INBOX', limit: 2000 }),
     onSuccess: ({ job_id }) => startOrganizeJob(job_id),
     onError: (error: Error) => {
       setSyncMessage(`AI 整理提交失败：${error.message}`, 6000)

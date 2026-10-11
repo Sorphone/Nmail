@@ -340,7 +340,7 @@ def classify_missing(account_id: int, folder: str = "INBOX", limit: int = 200,
 
 @jobs.runner("organize")
 def organize_job(job_id: int, account_id: int | None = None, folder: str = "INBOX",
-                 limit: int = 200) -> dict:
+                 limit: int = 2000) -> dict:
     """「AI 整理」任务体（IMPROVEMENT_PLAN §3.4）：逐账号补跑分类并上报进度。
 
     account_id=None 表示全部账号；结果结构与原同步端点一致，写入 result_json。
