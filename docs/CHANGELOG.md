@@ -3,6 +3,14 @@
 > 规范：每次功能变更在同一提交内在此追加一条。格式：`## 提交短hash — 标题` + 要点。
 > 与 git 提交一一对应；本文件是"发生了什么"，ARCHITECTURE 是"现在是什么样"。
 
+## 待提交 — fix: 窗口化 exe 启动即崩 + 打包缺前端产物不再静默 + 测试隔离失效（真实库被删事故）
+- **窗口化启动崩**：用户实测「任务管理器杀掉后重新双击 exe → 弹 Nmail 启动失败（`ValueError: Unable to configure formatter 'default'`）」。根因＝窗口化冻结构建（`nmail.spec` console=False）下 `sys.stdout/stderr` 为 `None`，而 uvicorn 0.54 的 `ColourizedFormatter.__init__` 直接调 `sys.stdout.isatty()` → `AttributeError` 被 logging dictConfig 包成该 ValueError。终端渠道（run.py / uvx）`sys.stdout` 非 None，故本地自构建 exe 才必现。修复＝cli 入口第一件事 `ensure_std_streams()`（None → devnull）；新增 `tests/test_cli_windowed.py` 两例守护栏（其一直接构造 uvicorn formatter，未接 devnull 即抛 AttributeError）
+- **打包静默丢前端**：20:57 那次本地重打包没先跑 `scripts/sync_frontend.sh`（`backend/app/static` 与 `frontend/dist` 双双缺失），而 `nmail.spec` 老写法 `if STATIC.is_dir()` 会**静默跳过**前端 → 打出的 exe `/` 返回 `{"detail":"前端未构建"}`，双击只见一行 JSON。改为：缺 `backend/app/static/index.html` 直接报错退出并提示先跑 sync_frontend.sh
+- 🔴 **测试隔离失效（真实库被级联删除）**：`tests/conftest.py` 原用 `os.environ.setdefault("NMAIL_DATA_DIR", tempfile.mkdtemp(...))`，而本机 shell 已把 `NMAIL_DATA_DIR` 导出为真实数据目录 `D:\Nmail\NmailData` ⇒ setdefault 不生效，**整轮全量 pytest 跑在真实邮箱库上**；`test_account_cleanup` 会遍历账号逐个 `DELETE /api/accounts/{id}`，把两个真实账号（sorphone@foxmail.com / wangxf@pxkj.com）连同 8000 余封邮件缓存级联删除，`secrets.json` 也被测试值覆盖。修复＝**无条件覆盖**为一次性临时目录 + 断言目录名（宁可测试跑不起来也不碰真实库）；实测「NMAIL_DATA_DIR 指向真实目录」下跑 `test_account_cleanup.py`，真实库账号数仍为 2、邮件数不变
+- **数据恢复（就地取证，未依赖备份）**：库 85%（798MB）是空闲页且 `auto_vacuum=0` ⇒ 旧页面字节仍在原地（`pxkj.com` 命中 32 万次）。页级雕刻空闲页（+溢出页链）捞回 **7,928 封真实邮件**（2015–2026，含正文/HTML），账号配置从 Kimi 会话导出里逐字取回，重建库后 `/api/accounts` 与 `/api/emails` 实测正常。**账号口令与 OAuth 随 secrets.json 一并丢失，需用户重填**（邮件本体在服务器上，重登后增量同步即可补齐）
+- 验证：ruff 通过；`test_cli_windowed.py` 2 例绿；真实 exe 经桌面快捷方式双击启动 → `/` 200 text/html、`/assets/*` 200、`/mail` SPA 回退 200、`/api/health` db ok、`/api/accounts` 两账号、`/api/emails` 5096 封
+- 会话：S-1013-2120-窗口化启动修复与前端产物重建
+
 ## f26fe2f — feat: 新构建自动感知——后端更新前端后页面提示一键刷新
 - 用户反馈缓存问题「还在」：缓存策略只保证刷新一次即最新，但已打开的页面跑在内存里，后端更新前端后不刷新就永远是旧界面（如新按钮要手动刷新才出现）——缺「有新版本」的感知
 - 机制：vite 构建收尾写 dist/build-id.json（每次 build 唯一）+ define 注入前端 __BUILD_ID__；/api/meta 现读该文件下发 frontend_build；前端 NewBuildBar 每 30s 轮询比对，不一致弹底部浮条「Nmail 已更新，刷新启用新界面」（一键 reload）。dev 模式热更新自带不启用；后端无指纹（旧 dist）不提示；不重启只重新 build 也能被感知（每请求现读）

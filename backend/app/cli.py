@@ -206,9 +206,25 @@ def _shortcut_command(install: bool) -> None:
         raise SystemExit(1)
 
 
+def ensure_std_streams() -> None:
+    """窗口化冻结构建（nmail.spec console=False）下 sys.stdout/stderr 是 None：
+    uvicorn 的 ColourizedFormatter 初始化直接调 sys.stdout.isatty()，本模块的
+    print 也会炸——启动最先把它们接到 devnull。
+
+    2026-10-13 实踩：新版 uvicorn（本机 0.54.0）在窗口化 exe 里必然走到这一步，
+    dictConfig 抛 ValueError: Unable to configure formatter 'default'，双击只看到
+    「Nmail 启动失败」弹框（终端渠道 sys.stdout 非 None，从不受影响）。
+    """
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+
+
 def main(argv: list[str] | None = None) -> None:
     """入口薄壳：未捕获异常先落日志再原样上抛（保留退出码）；
     SystemExit（--help/--version/参数错）直通不弹框。"""
+    ensure_std_streams()
     try:
         _launch(argv)
     except SystemExit:

@@ -23,8 +23,17 @@ datas = [(str(ROOT / "pyproject.toml"), ".")]
 APP_ASSETS = ROOT / "backend" / "app" / "assets"
 if APP_ASSETS.is_dir():
     datas.append((str(APP_ASSETS), "app/assets"))
-if STATIC.is_dir():
+if STATIC.is_dir() and (STATIC / "index.html").is_file():
     datas.append((str(STATIC), "app/static"))
+else:
+    # 缺前端产物时**直接失败**：老写法 `if STATIC.is_dir()` 会静默打出一个没有
+    # 界面的 exe（/ 返回 {"detail":"前端未构建"}），用户双击后只看到一行 JSON
+    # 错误（2026-10-13 实踩：static 与 frontend/dist 双双缺失仍构建成功）。
+    raise SystemExit(
+        "缺少前端产物 backend/app/static/index.html —— 打包前先执行：\n"
+        "    bash scripts/sync_frontend.sh\n"
+        "（该脚本会 npm ci + npm run build 并把 frontend/dist 同步进 backend/app/static）"
+    )
 
 a = Analysis(
     [str(ROOT / "backend" / "app" / "cli.py")],

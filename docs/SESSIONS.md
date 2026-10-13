@@ -16,6 +16,15 @@
 
 ## 进行中
 
+### S-1013-2120-窗口化启动修复与前端产物重建（含真实库误删事故） 🔄
+- 背景: 接 Kimi Code 会话（导出包 `session_4e9f2017`，工作目录 D:\kimidesktop1）在 10-13 21:00:45 被「5 小时额度墙」中断的落点——该会话已修好窗口化 stdout 崩溃并重打包，但验证只到 `/api/health`
+- 目标: ① 窗口化 exe 启动即崩（ValueError: Unable to configure formatter 'default'）② 复核其遗留状态与构建产物
+- 范围: backend/app/cli.py、backend/tests/test_cli_windowed.py（新增）、backend/tests/conftest.py、nmail.spec、docs(CHANGELOG/SESSIONS)
+- 发现: ① `sys.stdout is None`（console=False）+ uvicorn 0.54 的 `ColourizedFormatter` → 入口加 `ensure_std_streams()` ② 20:57 重打包未跑 sync_frontend.sh 且 spec 静默跳过前端 ⇒ 打出的 exe `/` 返回「前端未构建」（本轮已重建前端产物并重打包）③ **conftest 的 setdefault 让全量 pytest 跑在真实库上，级联删掉两个真实账号与 8000 余封邮件**
+- 恢复: 空闲页雕刻捞回 7,928 封真实邮件重建库；现场保留 `NmailData\_polluted-20261013-213810`（污染库原件）、`_forensics-20261013-212818`（21:28 快照）、`_carve\recovered.db`（雕刻结果）、`_restore\nmail.restored.db`（重建库）
+- 遗留: **账号口令/ OAuth 需用户重填**（secrets.json 被测试覆盖）；建议重登后跑一次「全部历史补齐」补全缺口
+- 时间: 2026-10-13 21:20 开工
+
 ### S-0921-1200-发送前检查与模板升级 ✅
 - 目标: 用户确认的三模块——①发送前检查规则层(空主题/模板占位符残留/附件意图核对;人工弹卡可越过,定时/AI 强制拦截退回+通知)②模板升级带主题+附件(KV 加 subject/attachments 字段、模板附件端点、前端模板编辑/插入联动、AI apply_template 同步)③发送前 AI 深审(review_send_draft,开关默认开,失败降级规则层)
 - 范围: backend(core/precheck.py 新增, core/outbox.py, api/{compose_extras,user_drafts,settings}.py, ai/{tasks,tools}.py, scheduler.py) + frontend(compose/{PrecheckModal 新增,ComposeForm,InsertDialogs}, DraftsHubPage, SettingsPage, types, client, openapi/schema.d.ts) + tests(test_precheck.py 新增, test_ai_tools_b6.py 扩) + docs(CHANGELOG/ARCHITECTURE/SESSIONS)
