@@ -3,7 +3,7 @@
 > 规范：每次功能变更在同一提交内在此追加一条。格式：`## 提交短hash — 标题` + 要点。
 > 与 git 提交一一对应；本文件是"发生了什么"，ARCHITECTURE 是"现在是什么样"。
 
-## 待提交 — fix: 窗口化 exe 启动即崩 + 打包缺前端产物不再静默 + 测试隔离失效（真实库被删事故）
+## 2c78f1d — fix: 窗口化 exe 启动即崩 + 打包缺前端产物不再静默 + 测试隔离失效（真实库被删事故）
 - **窗口化启动崩**：用户实测「任务管理器杀掉后重新双击 exe → 弹 Nmail 启动失败（`ValueError: Unable to configure formatter 'default'`）」。根因＝窗口化冻结构建（`nmail.spec` console=False）下 `sys.stdout/stderr` 为 `None`，而 uvicorn 0.54 的 `ColourizedFormatter.__init__` 直接调 `sys.stdout.isatty()` → `AttributeError` 被 logging dictConfig 包成该 ValueError。终端渠道（run.py / uvx）`sys.stdout` 非 None，故本地自构建 exe 才必现。修复＝cli 入口第一件事 `ensure_std_streams()`（None → devnull）；新增 `tests/test_cli_windowed.py` 两例守护栏（其一直接构造 uvicorn formatter，未接 devnull 即抛 AttributeError）
 - **打包静默丢前端**：20:57 那次本地重打包没先跑 `scripts/sync_frontend.sh`（`backend/app/static` 与 `frontend/dist` 双双缺失），而 `nmail.spec` 老写法 `if STATIC.is_dir()` 会**静默跳过**前端 → 打出的 exe `/` 返回 `{"detail":"前端未构建"}`，双击只见一行 JSON。改为：缺 `backend/app/static/index.html` 直接报错退出并提示先跑 sync_frontend.sh
 - 🔴 **测试隔离失效（真实库被级联删除）**：`tests/conftest.py` 原用 `os.environ.setdefault("NMAIL_DATA_DIR", tempfile.mkdtemp(...))`，而本机 shell 已把 `NMAIL_DATA_DIR` 导出为真实数据目录 `D:\Nmail\NmailData` ⇒ setdefault 不生效，**整轮全量 pytest 跑在真实邮箱库上**；`test_account_cleanup` 会遍历账号逐个 `DELETE /api/accounts/{id}`，把两个真实账号（sorphone@foxmail.com / wangxf@pxkj.com）连同 8000 余封邮件缓存级联删除，`secrets.json` 也被测试值覆盖。修复＝**无条件覆盖**为一次性临时目录 + 断言目录名（宁可测试跑不起来也不碰真实库）；实测「NMAIL_DATA_DIR 指向真实目录」下跑 `test_account_cleanup.py`，真实库账号数仍为 2、邮件数不变
